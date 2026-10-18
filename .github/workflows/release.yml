@@ -1,0 +1,38 @@
+name: Release
+
+# Публикует релиз из файлов в releases/: версия — из имени APK (CardOS-Partner-<версия>.apk).
+# Релиз создаёт github-actions[bot], поэтому автором релиза на GitHub значится бот.
+on:
+  push:
+    branches: [main]
+    paths: ['releases/*.apk']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create release for new APK versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for apk in releases/CardOS-Partner-*.apk; do
+            ver="${apk#releases/CardOS-Partner-}"; ver="${ver%.apk}"
+            tag="v${ver}"
+            if gh release view "$tag" >/dev/null 2>&1; then echo "skip $tag"; continue; fi
+            (cd releases && sha256sum -c "CardOS-Partner-${ver}.apk.sha256")
+            gh release create "$tag" "$apk" "$apk.sha256" \
+              --title "CardOS Partner ${ver}" \
+              --notes "CardOS Partner ${ver} для Android / for Android.
+
+          Пакет / package: \`dev.cardos.partner\` · подпись / signer: \`CN=CardOS\`
+          SHA-256 сертификата / certificate: \`17:36:A8:12:4E:39:80:0E:7E:4F:2D:1C:D6:03:24:FB:98:0F:18:62:C3:DB:BC:4B:36:6C:82:6F:2A:BC:8F:F6\`
+          SHA-256 файла / file: \`$(cut -d' ' -f1 "$apk.sha256")\`
+
+          Установка / install: см. README."
+          done
